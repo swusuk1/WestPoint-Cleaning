@@ -1,0 +1,130 @@
+---
+title: "Westpoint Cleaning"
+author: "Samuel W. Suk"
+date: '2022-04-22'
+output:
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+options(knitr.duplicate.label = "allow")
+```
+
+##Libraries
+```{r, include=FALSE}
+library(ggplot2)
+library(dplyr)
+library(vtable)
+library(tidyverse)
+library(jtools)
+library(fixest)
+library(rdrobust)
+library(margins)
+library(GGally)
+library(forcats)
+library(lubridate)
+library(tibble )
+```
+
+##Step 1
+Task is to clean and mutate the following West Point USMA data
+```{r, echo = TRUE}
+westpoint <- read.csv("Westpoint.csv")
+
+westpoint <-westpoint %>%
+  rename(year = ï..year)
+
+summary(westpoint)
+```
+
+##Step 2
+Recreating femalepeers, malespeers, and totpeople columns based on the documentation for each column
+
+```{r, echo=TRUE}
+#recreating malespeers
+westpoint2 <- westpoint %>%
+  group_by(company_n, class, year) %>%
+  mutate(malespeers2 = sum(1-female)- (1-female))
+
+#recreating femalespeers
+westpoint2 <- westpoint2 %>%
+  group_by(company_n, class, year) %>%
+  mutate(femalespeers2 = sum(female)- (female))
+
+#recreating totpeoples
+westpoint2 <- westpoint2 %>%
+  mutate(totpeople2 = malespeers2 + femalespeers2)
+
+#New columns
+westpoint2
+
+```
+
+##Step 3
+Investigate the rows for which your recreation "doesn't" line up exactly. Any ideas what the issue might be? Do you trust the original or your recreation more?
+
+  The recreation varies from the original model because it is not including myself, nor the column of people who are graduating or            continuing elsewhere. Depending on what I want to evaluate, with or without graduates, the trust is equal. 
+
+
+##Step 4
+Create two new columns from company_n: company, and division
+```{r, echo= TRUE}
+westpoint2$company = substr(westpoint2$company_n, 1, 1)
+westpoint2$division = substr(westpoint2$company_n, 3,3)
+westpoint2
+
+```
+
+##Step 5
+Limit data to years in which we have all four cohorts present in full quantity. 
+```{r, echo= TRUE}
+westpointfull <- westpoint2 %>%
+  filter(year > 80,
+         year < 82)
+```
+
+##Step 6a
+ Top four companies (A, B, C, etc., not A-1, A-2) with the highest continue_or_grad rates
+```{r, echo= TRUE}
+top4compgradrate <- westpointfull %>%
+  group_by(company) %>%
+  summarise(gradrate = mean(continue_or_grad)) %>%
+  arrange(gradrate) %>%
+slice(9:6)
+top4compgradrate
+```
+
+##Step 6b
+continue_or_grad rates by class 
+```{r, echo = TRUE}
+top4classgradrate <- westpointfull %>%
+  group_by(class) %>%
+  summarise(gradrate = mean(continue_or_grad)) %>%
+  arrange(-gradrate)
+top4classgradrate
+```
+
+##Step 6c
+continue_or_grad rates of women by class
+```{r, echo= TRUE}
+femalegradrate <- westpointfull %>%
+  filter(female == 1) %>%
+  group_by(female, class) %>%
+  summarise(gradrate = mean(continue_or_grad)) %>%
+  arrange(-gradrate) 
+femalegradrate
+
+```
+
+##Step 7
+Bonus task (ungraded): notice anything strange about the "random assignment" of women?
+
+  female peers are randomly assigned by blocks. When ordered by year, there are synchronized stretches of femalepeers from 1 to 2 all the     way to 8
+
+```{r, echo= TRUE}
+table(westpoint2$femalespeers)
+```
+
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
